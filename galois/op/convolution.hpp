@@ -22,7 +22,7 @@ class ConvolutionCreator : public op::Creator {
         auto out_shape = base_type->shape;
         int64_t total = 0;
         for (size_t i = 0; i < out_shape.size(); ++i) {
-            out_shape[i] = (ir_input_types[0]->shape[i] + 2 * 0 - ir_input_types[1]->shape[i]) / 1 + 1;
+            out_shape[i] = (ir_input_types[0]->shape[i] + 2 * 0 - ir_input_types[1]->shape[i]) / ir_input_types[2]->shape[0] + 1;
             GALOIS_ASSERT( out_shape[i] <= ir_input_types[0]->shape[i] );
         }
         GALOIS_ASSERT(out_shape.size() == 2);
@@ -40,11 +40,12 @@ class ConvolutionCreator : public op::Creator {
         ir_builder->Return(ir_output);
     }
 
-
     void ExpressInline(std::vector<std::shared_ptr<ir::Tensor>> ir_inputs, 
-                std::shared_ptr<ir::Tensor> ir_output, std::shared_ptr<ir::Builder> ir_builder) {
+                std::shared_ptr<ir::Tensor> ir_output,
+                std::shared_ptr<ir::Builder> ir_builder) {
         auto ir_act = ir_inputs[0];
         auto ir_weight = ir_inputs[1];
+        auto ir_stride = ir_inputs[2]->type->shape[0];
 
         auto input_shape = ir_act->type->shape;
         auto kernel_shape = ir_weight->type->shape;
@@ -58,9 +59,9 @@ class ConvolutionCreator : public op::Creator {
         output_accessor->transform_matrix(1, 1) = 1;
 
         auto input_accessor = ir_builder->CreateAccessor(ir_act);
-        input_accessor->transform_matrix(0, 0) = 1;
+        input_accessor->transform_matrix(0, 0) = ir_stride;
         input_accessor->transform_matrix(0, 2) = 1;
-        input_accessor->transform_matrix(1, 1) = 1;
+        input_accessor->transform_matrix(1, 1) = ir_stride;
         input_accessor->transform_matrix(1, 3) = 1;
 
         auto kernel_accessor = ir_builder->CreateAccessor(ir_weight);
@@ -75,7 +76,6 @@ class ConvolutionCreator : public op::Creator {
         }
 
         this->ExpressInline({input_accessor, kernel_accessor}, output_accessor, ir_builder);
-        
     }
 };
 }  // namespace galois::op

@@ -32,7 +32,7 @@ void convolution2d(float* output, float* input, float* weight, int rows_act, int
     }
 }
 
-TEST(GaloisTests, TestConvolution3x3) {
+TEST(GaloisTests, TestConv3x3_stride1) {
     int rows_act = 4, cols_act = 4;
     int length_act = rows_act * cols_act;
     int rows_weight = 3;
@@ -45,16 +45,18 @@ TEST(GaloisTests, TestConvolution3x3) {
 
     auto ir_act_type = ir::f32->Tile(rows_act, cols_act);
     auto ir_weight_type = ir::f32->Tile(rows_weight, cols_weight);
+    auto ir_stride_type = ir::f32->Tile(stride);
     auto ir_builder = ir::Builder::Create();
     auto ir_operator = ir_builder->CreateOperatorByCreator<op::ConvolutionCreator>(
-        {ir_act_type, ir_weight_type});
+        {ir_act_type, ir_weight_type, ir_stride_type});
 
     auto jit_engine = jit::Engine::Create();
-    auto conv_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *, float *)>(ir_operator);
+    auto conv_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *, float *, float *)>(ir_operator);
 
     std::vector<float> input(length_act);
     std::vector<float> weight(length_weight);
     std::vector<float> output(length_out);
+    std::vector<float> ir_stride(stride);
 
     for (int i = 0; i < length_act; ++i) {
         input[i] = static_cast<float>(i + 1);
@@ -63,7 +65,51 @@ TEST(GaloisTests, TestConvolution3x3) {
         weight[i] = 1.0f;
     }
 
-    float *result = conv_fun(input.data(), weight.data());
+    float *result = conv_fun(input.data(), weight.data(), ir_stride.data());
+    convolution2d(output.data(), input.data(), weight.data(), rows_act, rows_weight, stride, padding);
+    
+    for (int i = 0; i < length_out; ++i) {
+        EXPECT_NEAR(result[i], output[i], 1e-5)
+        << "Mismatch at index " << i << ": output=" << output[i];
+    }
+
+    free(result);
+}
+
+TEST(GaloisTests, TestConv3x3_stride3) {
+    int rows_act = 8, cols_act = 8;
+    int length_act = rows_act * cols_act;
+    int rows_weight = 3;
+    int cols_weight = rows_weight;
+    int length_weight = rows_weight * cols_weight;
+    int stride = 3;
+    int padding = 0;
+    int rows_out = (rows_act + 2 * padding - rows_weight) / stride + 1;
+    int length_out = rows_out * rows_out;
+
+    auto ir_act_type = ir::f32->Tile(rows_act, cols_act);
+    auto ir_weight_type = ir::f32->Tile(rows_weight, cols_weight);
+    auto ir_stride_type = ir::f32->Tile(stride);
+    auto ir_builder = ir::Builder::Create();
+    auto ir_operator = ir_builder->CreateOperatorByCreator<op::ConvolutionCreator>(
+        {ir_act_type, ir_weight_type, ir_stride_type});
+
+    auto jit_engine = jit::Engine::Create();
+    auto conv_fun = jit_engine->EmitOperatorSymbol<float *(*)(float *, float *, float *)>(ir_operator);
+
+    std::vector<float> input(length_act);
+    std::vector<float> weight(length_weight);
+    std::vector<float> output(length_out);
+    std::vector<float> ir_stride(stride);
+
+    for (int i = 0; i < length_act; ++i) {
+        input[i] = static_cast<float>(i + 1);
+    }
+    for (int i = 0; i < length_weight; ++i) {
+        weight[i] = 1.0f;
+    }
+
+    float *result = conv_fun(input.data(), weight.data(), ir_stride.data());
     convolution2d(output.data(), input.data(), weight.data(), rows_act, rows_weight, stride, padding);
     
     for (int i = 0; i < length_out; ++i) {
