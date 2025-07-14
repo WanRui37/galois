@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.14)
 
 project(galois CXX C)
 
+set(CMAKE_PREFIX_PATH "/home/wanrui/workspace/1-LLM/2-libtorch/libtorch" ${CMAKE_PREFIX_PATH})
 set(CMAKE_WARN_DEPRECATED OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # 用于智能提示
 set(CMAKE_CXX_STANDARD 23) # c++20目前系统库还不支持, 没有必要
